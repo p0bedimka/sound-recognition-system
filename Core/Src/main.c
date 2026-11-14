@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "app.h"
+#include "indicator.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -32,6 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define RTC_BACKUP_MAGIC 0x32F2U
 
 /* USER CODE END PD */
 
@@ -101,6 +103,7 @@ int main(void) {
     MX_DFSDM1_Init();
     MX_RTC_Init();
     MX_USART3_UART_Init();
+    (void)indicator_request(INDICATION_PERIPHERALS_READY);
     /* USER CODE BEGIN 2 */
     app_run();
     /* USER CODE END 2 */
@@ -139,7 +142,7 @@ void SystemClock_Config(void) {
     RCC_OscInitStruct.PLL.PLLM = 8;
     RCC_OscInitStruct.PLL.PLLN = 192;
     RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-    RCC_OscInitStruct.PLL.PLLQ = 2;
+    RCC_OscInitStruct.PLL.PLLQ = 4;
     RCC_OscInitStruct.PLL.PLLR = 2;
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
         Error_Handler();
@@ -241,6 +244,7 @@ static void MX_RTC_Init(void) {
     }
 
     /* USER CODE BEGIN Check_RTC_BKUP */
+    if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != RTC_BACKUP_MAGIC) {
 
     /* USER CODE END Check_RTC_BKUP */
 
@@ -263,6 +267,8 @@ static void MX_RTC_Init(void) {
         Error_Handler();
     }
     /* USER CODE BEGIN RTC_Init 2 */
+        HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, RTC_BACKUP_MAGIC);
+    }
 
     /* USER CODE END RTC_Init 2 */
 }

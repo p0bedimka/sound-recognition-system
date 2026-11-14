@@ -117,7 +117,7 @@ void HAL_DFSDM_FilterMspInit(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
         GPIO_InitStruct.Pin = GPIO_PIN_2;
         GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
         GPIO_InitStruct.Pull = GPIO_NOPULL;
-        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
         GPIO_InitStruct.Alternate = GPIO_AF8_DFSDM1;
         HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
@@ -375,7 +375,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart) {
         hdma_usart3_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
         hdma_usart3_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
         hdma_usart3_tx.Init.Mode = DMA_NORMAL;
-        hdma_usart3_tx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
+        hdma_usart3_tx.Init.Priority = DMA_PRIORITY_LOW;
         hdma_usart3_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
         if (HAL_DMA_Init(&hdma_usart3_tx) != HAL_OK) {
             Error_Handler();
