@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "app.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -101,7 +102,7 @@ int main(void) {
     MX_RTC_Init();
     MX_USART3_UART_Init();
     /* USER CODE BEGIN 2 */
-
+    app_run();
     /* USER CODE END 2 */
 
     /* Infinite loop */
