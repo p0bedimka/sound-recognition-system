@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-/* UART3 emits unframed 16 kHz, mono, signed PCM16 little-endian samples. */
+/* USART3 receives recording commands and sends framed 16 kHz mono PCM16 audio. */
 void app_run(void);
 
 extern volatile uint32_t audio_capture_blocks;
@@ -16,5 +16,6 @@ extern volatile uint32_t audio_uart_blocks;
 extern volatile uint32_t audio_uart_drops;
 extern volatile uint32_t audio_uart_errors;
 extern volatile uint32_t audio_dfsdm_errors;
+extern volatile uint32_t audio_uart_command_errors;
 
 #endif //SOUND_RECOGNITION_SYSTEM_APP_H
