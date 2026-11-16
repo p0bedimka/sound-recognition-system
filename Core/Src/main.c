@@ -43,6 +43,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+CRC_HandleTypeDef hcrc;
+
 DFSDM_Filter_HandleTypeDef hdfsdm1_filter0;
 DFSDM_Channel_HandleTypeDef hdfsdm1_channel0;
 DMA_HandleTypeDef hdma_dfsdm1_flt0;
@@ -63,6 +65,7 @@ static void MX_DMA_Init(void);
 static void MX_DFSDM1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_CRC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -103,7 +106,7 @@ int main(void) {
     MX_DFSDM1_Init();
     MX_RTC_Init();
     MX_USART3_UART_Init();
-    (void)indicator_request(INDICATION_PERIPHERALS_READY);
+    MX_CRC_Init();
     /* USER CODE BEGIN 2 */
     app_run();
     /* USER CODE END 2 */
@@ -164,6 +167,28 @@ void SystemClock_Config(void) {
     /** Enables the Clock Security System
     */
     HAL_RCC_EnableCSS();
+}
+
+/**
+  * @brief CRC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CRC_Init(void) {
+    /* USER CODE BEGIN CRC_Init 0 */
+
+    /* USER CODE END CRC_Init 0 */
+
+    /* USER CODE BEGIN CRC_Init 1 */
+
+    /* USER CODE END CRC_Init 1 */
+    hcrc.Instance = CRC;
+    if (HAL_CRC_Init(&hcrc) != HAL_OK) {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN CRC_Init 2 */
+
+    /* USER CODE END CRC_Init 2 */
 }
 
 /**
@@ -246,27 +271,27 @@ static void MX_RTC_Init(void) {
     /* USER CODE BEGIN Check_RTC_BKUP */
     if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != RTC_BACKUP_MAGIC) {
 
-    /* USER CODE END Check_RTC_BKUP */
+        /* USER CODE END Check_RTC_BKUP */
 
-    /** Initialize RTC and set the Time and Date
-    */
-    sTime.Hours = 0x0;
-    sTime.Minutes = 0x0;
-    sTime.Seconds = 0x0;
-    sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-    sTime.StoreOperation = RTC_STOREOPERATION_RESET;
-    if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK) {
-        Error_Handler();
-    }
-    sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-    sDate.Month = RTC_MONTH_JANUARY;
-    sDate.Date = 0x1;
-    sDate.Year = 0x0;
+        /** Initialize RTC and set the Time and Date
+        */
+        sTime.Hours = 0x0;
+        sTime.Minutes = 0x0;
+        sTime.Seconds = 0x0;
+        sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+        sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+        if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK) {
+            Error_Handler();
+        }
+        sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+        sDate.Month = RTC_MONTH_JANUARY;
+        sDate.Date = 0x1;
+        sDate.Year = 0x0;
 
-    if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK) {
-        Error_Handler();
-    }
-    /* USER CODE BEGIN RTC_Init 2 */
+        if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK) {
+            Error_Handler();
+        }
+        /* USER CODE BEGIN RTC_Init 2 */
         HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, RTC_BACKUP_MAGIC);
     }
 

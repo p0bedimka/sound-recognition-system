@@ -13,14 +13,15 @@
 
 #define UART_SYNC_0 0xA5U
 #define UART_SYNC_1 0x5AU
-#define UART_PROTOCOL_VERSION 0x01U
+#define UART_PROTOCOL_VERSION 0x02U
 #define UART_PACKET_TYPE_START 0x01U
 #define UART_PACKET_TYPE_STOP 0x02U
 #define UART_PACKET_TYPE_AUDIO 0x10U
 #define UART_HEADER_SIZE 10U
-#define UART_CRC_SIZE 2U
+#define UART_CRC_SIZE 4U
 #define UART_MAX_PAYLOAD_SIZE AUDIO_BLOCK_BYTES
 #define UART_MAX_FRAME_SIZE (UART_HEADER_SIZE + UART_MAX_PAYLOAD_SIZE + UART_CRC_SIZE)
+#define UART_CRC_MAX_INPUT_SIZE (UART_HEADER_SIZE - 2U + UART_MAX_PAYLOAD_SIZE)
 #define UART_COMMAND_QUEUE_SIZE 4U
 
 typedef enum {
@@ -36,11 +37,13 @@ typedef enum {
 
 extern DFSDM_Filter_HandleTypeDef hdfsdm1_filter0;
 extern UART_HandleTypeDef huart3;
+extern CRC_HandleTypeDef hcrc;
 
 static int32_t dfsdm_dma[AUDIO_DMA_SAMPLE_COUNT];
 static uint8_t uart_tx_buffer[UART_MAX_FRAME_SIZE];
 static uint8_t uart_rx_byte;
 static uint8_t uart_rx_frame[UART_MAX_FRAME_SIZE];
+static uint32_t uart_crc_words[UART_CRC_MAX_INPUT_SIZE / sizeof(uint32_t)];
 static uint16_t uart_rx_index;
 static uint16_t uart_rx_expected_size;
 static uart_parse_state_t uart_parse_state;
@@ -62,17 +65,23 @@ volatile uint32_t audio_uart_errors;
 volatile uint32_t audio_dfsdm_errors;
 volatile uint32_t audio_uart_command_errors;
 
-static uint16_t crc16_ccitt(const uint8_t *data, uint16_t size) {
-    uint16_t crc = 0xFFFFU;
-
-    for (uint16_t i = 0U; i < size; i++) {
-        crc ^= (uint16_t)data[i] << 8;
-        for (uint8_t bit = 0U; bit < 8U; bit++) {
-            crc = (crc & 0x8000U) != 0U ? (uint16_t)((crc << 1) ^ 0x1021U) : (uint16_t)(crc << 1);
-        }
+static bool calculate_crc32(const uint8_t *data, uint16_t size, uint32_t *crc) {
+    if ((size % sizeof(uint32_t)) != 0U || size > UART_CRC_MAX_INPUT_SIZE) {
+        return false;
     }
 
-    return crc;
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    for (uint16_t i = 0U; i < size; i += sizeof(uint32_t)) {
+        uart_crc_words[i / sizeof(uint32_t)] = ((uint32_t)data[i] << 24)
+                                               | ((uint32_t)data[i + 1U] << 16)
+                                               | ((uint32_t)data[i + 2U] << 8)
+                                               | (uint32_t)data[i + 3U];
+    }
+
+    *crc = HAL_CRC_Calculate(&hcrc, uart_crc_words, size / sizeof(uint32_t));
+    __set_PRIMASK(primask);
+    return true;
 }
 
 static void queue_command(record_command_t command) {
@@ -107,11 +116,16 @@ static void process_uart_frame(void) {
     uint8_t version = uart_rx_frame[2];
     uint8_t packet_type = uart_rx_frame[3];
     uint16_t payload_size = (uint16_t)uart_rx_frame[8] | ((uint16_t)uart_rx_frame[9] << 8);
-    uint16_t expected_crc = (uint16_t)uart_rx_frame[UART_HEADER_SIZE + payload_size]
-                            | ((uint16_t)uart_rx_frame[UART_HEADER_SIZE + payload_size + 1U] << 8);
-    uint16_t actual_crc = crc16_ccitt(&uart_rx_frame[2], (uint16_t)(8U + payload_size));
+    uint32_t crc_offset = UART_HEADER_SIZE + payload_size;
+    uint32_t expected_crc = (uint32_t)uart_rx_frame[crc_offset]
+                            | ((uint32_t)uart_rx_frame[crc_offset + 1U] << 8)
+                            | ((uint32_t)uart_rx_frame[crc_offset + 2U] << 16)
+                            | ((uint32_t)uart_rx_frame[crc_offset + 3U] << 24);
+    uint32_t actual_crc;
 
-    if (version != UART_PROTOCOL_VERSION || expected_crc != actual_crc) {
+    if (version != UART_PROTOCOL_VERSION
+        || !calculate_crc32(&uart_rx_frame[2], (uint16_t)(8U + payload_size), &actual_crc)
+        || expected_crc != actual_crc) {
         audio_uart_command_errors++;
         return;
     }
@@ -154,7 +168,9 @@ static void parse_uart_byte(uint8_t byte) {
     uart_rx_frame[uart_rx_index++] = byte;
     if (uart_rx_index == UART_HEADER_SIZE) {
         uint16_t payload_size = (uint16_t)uart_rx_frame[8] | ((uint16_t)uart_rx_frame[9] << 8);
-        if (uart_rx_frame[2] != UART_PROTOCOL_VERSION || payload_size > UART_MAX_PAYLOAD_SIZE) {
+        uint8_t packet_type = uart_rx_frame[3];
+        bool is_command = packet_type == UART_PACKET_TYPE_START || packet_type == UART_PACKET_TYPE_STOP;
+        if (uart_rx_frame[2] != UART_PROTOCOL_VERSION || !is_command || payload_size != 0U) {
             audio_uart_command_errors++;
             reset_uart_parser();
             return;
@@ -230,10 +246,18 @@ static void transmit_block(uint8_t block, uint32_t sequence) {
         uart_tx_buffer[sample_offset + 1U] = (uint8_t)(((uint16_t)pcm_sample >> 8) & 0xFFU);
     }
 
-    uint16_t crc = crc16_ccitt(&uart_tx_buffer[2], (uint16_t)(8U + AUDIO_BLOCK_BYTES));
+    uint32_t crc;
+    if (!calculate_crc32(&uart_tx_buffer[2], (uint16_t)(8U + AUDIO_BLOCK_BYTES), &crc)) {
+        audio_uart_errors++;
+        audio_fault = true;
+        return;
+    }
+
     uint16_t crc_offset = (uint16_t)(UART_HEADER_SIZE + AUDIO_BLOCK_BYTES);
     uart_tx_buffer[crc_offset] = (uint8_t)(crc & 0xFFU);
-    uart_tx_buffer[crc_offset + 1U] = (uint8_t)(crc >> 8);
+    uart_tx_buffer[crc_offset + 1U] = (uint8_t)((crc >> 8) & 0xFFU);
+    uart_tx_buffer[crc_offset + 2U] = (uint8_t)((crc >> 16) & 0xFFU);
+    uart_tx_buffer[crc_offset + 3U] = (uint8_t)(crc >> 24);
 
     uart_tx_busy = true;
     __DMB();
