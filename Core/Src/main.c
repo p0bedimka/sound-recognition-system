@@ -209,8 +209,8 @@ static void MX_DFSDM1_Init(void) {
     hdfsdm1_filter0.Init.RegularParam.FastMode = ENABLE;
     hdfsdm1_filter0.Init.RegularParam.DmaMode = ENABLE;
     hdfsdm1_filter0.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-    hdfsdm1_filter0.Init.FilterParam.Oversampling = 25;
-    hdfsdm1_filter0.Init.FilterParam.IntOversampling = 8;
+    hdfsdm1_filter0.Init.FilterParam.Oversampling = 40;
+    hdfsdm1_filter0.Init.FilterParam.IntOversampling = 5;
     if (HAL_DFSDM_FilterInit(&hdfsdm1_filter0) != HAL_OK) {
         Error_Handler();
     }
@@ -270,7 +270,6 @@ static void MX_RTC_Init(void) {
 
     /* USER CODE BEGIN Check_RTC_BKUP */
     if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != RTC_BACKUP_MAGIC) {
-
         /* USER CODE END Check_RTC_BKUP */
 
         /** Initialize RTC and set the Time and Date
